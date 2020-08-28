@@ -54,3 +54,7 @@ typedef struct{
     unsigned int crc
 }mb_command;
 
+typedef struct{
+
+}mb_data
+
