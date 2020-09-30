@@ -1,5 +1,4 @@
-#include <stdio.h>
-#include <string.h>
+#include "hj212"
 
 
 typedef unsigned int u16;
@@ -7,7 +6,7 @@ typedef unsigned char u8;
 
 /**
  * @Brief : 将两个u8数据合并成1个u16数据
- * @param  data             
+ * @param  data :           
  * @param  type ：0和2代表高字节在前，1和3代表低字节在前            
  * @return u16 
  */
@@ -247,7 +246,7 @@ void handle_accracy(u8 type,u8* str)
 
 }
 
-u16 environment_212_protocol_crc16_check(u8 *puchMsg, u16 usDataLen)
+u16 HJ212_crc16(u8 *puchMsg, u16 usDataLen)
 {
     u16 i,j,crc_reg,check;
     crc_reg = 0xFFFF;
