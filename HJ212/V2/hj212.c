@@ -3,9 +3,9 @@
 
 /***************************** 内部函数 开始 *********************************/
 /**
- * @Brief : 将ascii转为整型
+ * @Brief : 将ACSII形式的数字转化为数值形式的数字   "1256"->value:1256
  * @param  str
- * @return s16 
+ * @return s16
  */
 static u16 ascii_to_u16(char *str)
 {
@@ -16,6 +16,43 @@ static u16 ascii_to_u16(char *str)
         *str++;
     }
     return res;
+}
+
+/**
+ * @Brief : 将ASCII形式的16进制字符转化为数字   'A'->10,'b'->11,'9'->9
+ * @param  str
+ * @return u8  para err:0
+ */
+static u8 char_to_num(char ch)
+{
+    if (ch >= '0' && ch <= '9')
+        return (ch - '0');
+    else if (ch >= 'a' && ch <= 'f')
+        return (ch - 'a' + 10);
+    else if (ch >= 'A' && ch <= 'F')
+        return (ch - 'A' + 10);
+
+    return '!';
+}
+
+/**
+ * @Brief : 将ACSII形式的16进制数字转化为数值形式的数字    "078A"->value:1930
+ * @param  str
+ * @return u16
+ */
+static u16 ascii16_to_u16(char *str)
+{
+    u16 res = 0;  //结果
+    u8 num=0;
+    char *p;
+
+    for (p = str; char_to_num(*p) != '!'; p++)
+    {
+        num = char_to_num(*p);
+        res = res * 16 + num;
+    }
+    return res;
+
 }
 
 /**
@@ -42,16 +79,16 @@ static s8 u16_to_ascii(u16 num_u16, char *asc)
 
     for (i = 0; i < j; i++)
     {
-        str[i] = temp[j - i - 1];
+        asc[i] = temp[j - i - 1];
     }
 
     if (!i)
     {
-        str[i] = '0'; //如果num_u16=0
+        asc[i] = '0'; //如果num_u16=0
     }
     else
     {
-        str[i] = '\0'; // 字符串末尾加0
+        asc[i] = '\0'; // 字符串末尾加0
     }
     return 1;
 
@@ -66,17 +103,18 @@ static s8 u16_to_ascii(u16 num_u16, char *asc)
 static s8 s16_to_ascii(s16 num_s16, char *asc)
 {
     u8 temp[8];
-    u8 i = 0, j = 0;
+    u8 i = 0, j = 0, type = 0;
 
     if (asc == NULL)
         return -1;
 
     if (num_s16 & 0x8000) //<0 负数以补码形式存储，这里要将负数转化为正数
     {
+        type = 1;
         num_s16 = ~num_s16;
         num_s16 = num_s16 + 1;
-        num_s16 = num_s16 << 16;
-        num_s16 = num_s16 >> 16;
+        // num_s16 = num_s16 << 16;
+        // num_s16 = num_s16 >> 16;
     }
 
     while (num_s16)
@@ -85,23 +123,26 @@ static s8 s16_to_ascii(s16 num_s16, char *asc)
         i++;
         num_s16 /= 10;
     }
-
     j = i;
-    temp[j] = '-';
-    j = j + 1;
+
+    if (type == 1)
+    {
+        temp[j] = '-';
+        j = j + 1;
+    }
 
     for (i = 0; i < j; i++)
     {
-        str[i] = temp[j - i - 1];
+        asc[i] = temp[j - i - 1];
     }
 
     if (!i)
     {
-        str[i] = '0';
+        asc[i] = '0';
     }
     else
     {
-        str[i] = 0;
+        asc[i] = 0;
     }
     return 1;
 }
@@ -227,11 +268,56 @@ s8 hj212_check_pw(const u8 *pkt, const u8 *pw)
 }
 
 /**
+ * @Brief : 检查服务器下发数据包的CRC校验
+ * @param  pkt
+ * @param  crc
+ * @return s8   para err:-1,mach err:-2,compare err:-3  ok:1
+ */
+s8  hj212_check_crc(const u8 *pkt, const u16 crc)
+{
+    char *point = NULL;
+    u16 tem = 0;
+
+    if (pkt == NULL)
+        return -1;
+
+    point = strstr(pkt, "&&");
+    if (point == NULL)
+    {
+        return -2;
+    }
+    else
+    {
+        point = strstr((point + 2), "&&");
+        if (point == NULL)
+        {
+            return -2;
+        }
+        else
+        {
+            point += 2;
+        }
+    }
+
+    tem = ascii16_to_u16(point);
+    if (tem == crc)
+    {
+        return 1;
+    }
+    else
+    {
+        return -3;
+    }
+
+
+}
+
+/**
  * @Brief : 解析服务器下发的反控命令数据包
  * @param  pkt
  * @return 返回命令字段CN
  * err return: para err:-1, mach err:-2, len err:-3
- */ver
+ */
 s16 hj212_ver_cn(const u8 *pkt)
 {
     char *point = NULL;
@@ -267,8 +353,23 @@ s16 hj212_ver_cn(const u8 *pkt)
  * @param  args
  * @return s8 '1':准备执行请求, '3':PW错误, '4':MN错误, '8':CN错误, '9':CRC错误
  */
-s8 hj212_ver_QnRtn(const u8 *pkt, E212_ARGS *args)
+QnRtn_code hj212_ver_QnRtn(u8 *pkt, E212_ARGS *args)
 {
+    char Qn = 0;
+    u16 crc = 0;
+
+    crc  = hj212_crc16(&pkt[6], strlen(pkt) - 12);
+
+    if(1 != hj212_check_crc(pkt, crc))//检查crc
+        return QnRtn_err_crc;
+    
+    if(1 != hj212_check_mn(pkt, args->device_code))
+        return QnRtn_err_mn;
+
+    if(1 != hj212_check_pw(pkt, args->password))
+        return QnRtn_err_pw;
+    
+    return QnRtn_ready;
 
 }
 

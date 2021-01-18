@@ -66,8 +66,9 @@ typedef enum{
 u16 hj212_crc16(u8 *puchMsg, u16 usDataLen);
 s8  hj212_check_mn(const u8* pkt,const u8* mn);
 s8  hj212_check_pw(const u8* pkt,const u8* pw);
+s8  hj212_check_crc(const u8* pkt,const u16 crc);
 s16 hj212_ver_cn(const u8* pkt);
-s8  hj212_ver_QnRtn(const u8* pkt,E212_ARGS* args);
+QnRtn_code  hj212_ver_QnRtn(u8* pkt,E212_ARGS* args);
 s8  hj212_pkt_getadress(const u8* pkt, u16* address);
 s8  hj212_pkt_getvalue(const u8* pkt, u16* value);
 
